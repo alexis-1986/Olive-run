@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Gamedev Canvas Workshop</title>
+    <style>
+     * { padding: 0; margin: 0; }
+     canvas { background: #eee; display: block; margin: 0 auto; border: 20px solid #0095DD;}
+    </style>
+</head>
+<body>
+
+
+
+<canvas id="myCanvas" width="1000" height="600"></canvas>
+
+<script>
+// Votre code JavaScript ici
+	
+	// définition des variables globales
+	var canvas = document.getElementById("myCanvas");
+	var ctx = canvas.getContext("2d");
+	
+	// position courant Olivier
+	var curOliv = {x : 0, y : 0};
+	// prochaine position Olivier
+	var prevOliv = {x : 0, y : 0};
+	// position bière
+	var beer = {x : 0, y : 0};
+	// position précédente de la souris
+	var prevMouse = {x : 0, y : 0};
+	// delta à ajouter à la position courante Olivier
+	// en fonction du déplacement de la souris
+	var dX = 0;
+	var dY = 0;
+		
+
+	// dimension briques
+	var brickWidth = 50;
+	var brickHeight = 50;
+	
+	// ajustement du nombre de briques 
+	var randomMax = 1000;
+	var randomThresh = 150;
+	// liste des positions des briques
+	var brickPos = [];
+
+	// image Olivier
+	var img = new Image();
+	// image bière
+	var imgBeer= new Image();
+	
+	
+	var time = 0;
+	var duration = 60;
+	
+	var score = 0;
+	var lives = 3;
+	
+	var speed = 2;
+
+	var looseLifeTime = duration;
+	
+	var colDetected = false;
+	
+	// ***************************
+	// fonctions d'initialization
+	// ***************************
+	function initBrickPos()
+	{
+		for (var r = 0; r < Math.floor(canvas.height / brickHeight); r++)
+		{
+			brickPos[r] = [];
+			
+			for (var c = 0; c < Math.floor(canvas.width / brickWidth); c++)
+			{
+				if (Math.random() * randomMax < randomThresh)
+				{
+					brickPos[r][c] = {x : c * brickWidth, y : r * brickHeight, type : "wall"};
+				}	
+				else
+				{
+					brickPos[r][c] = {x : c * brickWidth, y : r * brickHeight, type : "path"};
+				}		
+			}	
+		}
+	}
+	
+	
+	function initCharacterOrObject(pos, type, img, imgPath)
+	{
+		if (brickPos.length == 0)
+		{
+			console.log("initImages: brickPos not initialized")
+			return;
+		}
+		
+		var r = 0;
+		var c = 0;
+		
+		do 
+		{
+			r = Math.floor(Math.random() * brickPos.length);
+			c = Math.floor(Math.random() * brickPos[r].length);
+			
+		}
+		while (brickPos[r][c].type != "path")
+
+		pos.x = brickPos[r][c].x; 
+		pos.y = brickPos[r][c].y;
+		
+		brickPos[r][c].type = type;
+		
+		img.addEventListener('load', function() 
+		{
+			ctx.drawImage(img, pos.x, pos.y);
+		
+		}, false);
+		img.src = imgPath;
+	}
+	
+	
+	
+	function initImages()
+	{
+	
+		if (brickPos.length == 0)
+		{
+			console.log("initImages: brickPos not initialized")
+			return;
+		}
+		
+		var r = 0;
+		var c = 0;
+		
+		do 
+		{
+			r = Math.floor(Math.random() * brickPos.length);
+			c = Math.floor(Math.random() * brickPos[r].length);
+			
+		}
+		while (brickPos[r][c].type == "wall")
+
+		curOliv = {x : brickPos[r][c].x, y : brickPos[r][c].y};
+		
+		brickPos[r][c].type = "oliv";
+		
+		img.addEventListener('load', function() 
+		{
+			ctx.drawImage(img, curOliv.x, curOliv.y);
+		
+		}, false);
+		img.src = "olivier_2.jpg"
+
+		
+		do 
+		{
+			r = Math.floor(Math.random() * brickPos.length);
+			c = Math.floor(Math.random() * brickPos[r].length);
+			
+		}
+		while (brickPos[r][c].type == "wall" || brickPos[r][c].type == "oliv")
+		
+		beer = {x : brickPos[r][c].x, y : brickPos[r][c].y};
+		
+		brickPos[r][c].type = "beer";
+			
+		imgBeer.addEventListener('load', function() 
+		{
+		
+			ctx.drawImage(imgBeer, beer.x, beer.y);
+		
+		}, false);
+		imgBeer.src = "binouze_2.jpg"
+	
+	}
+	
+	function drawScore()
+	{
+		ctx.font = "bold 20px Arial";
+		ctx.fillStyle = "black";
+		ctx.fillText("Score: " + score, 8, 20);
+	
+	}
+	
+	function drawLives()
+	{
+		ctx.font = "bold 20px Arial";
+		ctx.fillStyle = "black";
+		ctx.fillText("Lives: " + lives, 8, 50);
+	
+	}
+	
+	
+	
+	function updateTime(timestamp)
+	{
+		if (isNaN(timestamp))
+		{
+			time = duration;
+		}
+		else
+		{
+			time = duration - Math.floor(timestamp / 1000) > 0 ? duration - Math.floor(timestamp / 1000) : 0;
+		}
+		
+		
+		if (time == 0)
+		{
+			alert("score: " + score);
+			document.location.reload();
+		}
+	}
+	
+	
+	function drawTimer()
+	{
+		ctx.font = "bold 20px Arial";
+		ctx.fillStyle = "black";
+		ctx.fillText("Time: " + time, canvas.width - 110, 20);
+	
+	}
+	
+	// ***************************
+	// fonctions d'affichage
+	// ***************************
+	function drawBricks()
+	{	
+				
+		for (var r = 0; r < brickPos.length; r++)
+		{
+			for (var c = 0; c < brickPos[r].length; c++)
+			{
+				if (brickPos[r][c].type == "wall")
+				{
+					ctx.beginPath();
+					ctx.rect(brickPos[r][c].x, brickPos[r][c].y,  brickWidth, brickHeight);
+					if (colDetected)
+					{
+						ctx.fillStyle = "red";
+						canvas.style.borderColor = "red";
+					}
+					else
+					{
+						ctx.fillStyle = "#0095DD";
+						canvas.style.borderColor = "#0095DD";
+					}
+					
+					ctx.fill();
+					ctx.closePath();
+				}
+			}
+		}
+	}
+	
+	function drawBeer()
+	{
+		ctx.drawImage(imgBeer, beer.x, beer.y);
+	}
+	
+	// *************************************
+	// fonctions de détection des collisions
+	// *************************************
+	function rectCollision(r1, r1Width, r1Height, r2, r2Width, r2Height)
+	{
+		if (r1.x > r2.x + r2Width || r2.x > r1.x + r1Width)
+		{
+			return false;
+		}
+		
+		if (r1.y > r2.y + r2Height || r2.y > r1.y + r1Height)
+		{
+			return false;
+		
+		}
+		
+		return true;
+	}
+		
+	function checkBrickCollision(pos)
+	{
+		for (var r = 0; r < brickPos.length; r++)
+		{
+			for (var c = 0; c <  brickPos[r].length; c++)
+			{
+				if (brickPos[r][c].type == "wall" && rectCollision(brickPos[r][c], brickWidth, brickHeight, pos, img.width, img.height))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
+	function checkBorderCollision(pos)
+	{
+
+		if (pos.x < 0 || pos.x > canvas.width - 30)
+		{
+			return true;
+		}
+		
+		if (pos.y < 0 || pos.y > canvas.height - 45)
+		{
+			return true;
+		}
+		
+		return false;
+		
+	}
+	
+	function checkBeerCollision()
+	{
+		if (rectCollision(curOliv, img.width, img.height, beer, imgBeer.width, imgBeer.height))
+		{
+			score += 1;
+				initCharactersOrObjects([{pos : curOliv, type : "oliv", img : img,  imgPath : "olivier_2.jpg"}, {pos : beer, type : "beer", img : imgBeer,  imgPath : "binouze_2.jpg"}]);
+		}
+	}
+
+	// *************************************
+	// boucle du jeu
+	// *************************************
+	function gameLoop(timestamp)
+	{
+		updateTime(timestamp);
+		translateOliv();
+		updateLives();
+		checkLoose();
+		checkBeerCollision();
+		
+			
+		drawBricks();
+		drawBeer();
+		drawScore();
+		drawTimer();
+		drawLives();
+		
+		requestAnimationFrame(gameLoop);
+	}
+	
+	
+	function checkLoose()
+	{
+		if (lives == 0)
+		{
+			alert("score: " + score);
+		
+			document.location.reload();
+		
+		}
+	
+	}
+	
+	function updateLives()
+	{
+		if (colDetected == true && canLoose() == true)
+		{
+			lives -= 1;
+		}
+	
+	}
+	
+		
+	function canLoose()
+	{
+		
+		if (time <= looseLifeTime)
+		{
+			looseLifeTime = time - 1;
+			return true;		
+		}
+		
+		return false;
+	}
+	
+
+	// *************************************
+	//	fonction de calcul des déplacements
+	// *************************************
+	function translateOliv()
+	{
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		
+		var newOliv = {x : curOliv.x +  speed * dX, y : curOliv.y + speed * dY};
+
+		if (checkBrickCollision(newOliv) == true || checkBorderCollision(newOliv) == true)
+		{
+			ctx.drawImage(img, curOliv.x, curOliv.y);	
+			colDetected = true;
+
+		}
+		else
+		{
+			ctx.drawImage(img, newOliv.x, newOliv.y);
+			curOliv = newOliv;	
+			colDetected = false;
+		}
+				
+	}
+	
+	function initCharactersOrObjects(charOrObjArray)
+	{
+		for (var i = 0, l = charOrObjArray.length; i < l; i++)
+		{			
+			initCharacterOrObject(charOrObjArray[i].pos, charOrObjArray[i].type, charOrObjArray[i].img, charOrObjArray[i].imgPath);
+		}
+	
+	}
+	
+	// *************************************
+	//	fonction de gestion de la souris
+	// *************************************
+	function mouseMoveHandler(e)
+	{
+		var relativeX = e.clientX - prevMouse.x;
+		var relativeY = e.clientY - prevMouse.y;
+		
+		var magnitude = Math.sqrt(Math.pow(relativeX, 2) + Math.pow(relativeY, 2));
+		
+		if (magnitude != 0)
+		{
+			dX = relativeX / magnitude;
+			dY = relativeY / magnitude;
+		}
+		
+		prevMouse = {x : e.clientX, y : e.clientY};
+	}
+	
+	
+	document.addEventListener("mousemove", mouseMoveHandler, false);
+
+	// début du jeu 
+	initBrickPos();
+//	initImages();
+	initCharactersOrObjects([{pos : curOliv, type : "oliv", img : img,  imgPath : "olivier_2.jpg"}, {pos : beer, type : "beer", img : imgBeer,  imgPath : "binouze_2.jpg"}]);
+//	initCharacterOrObject(curOliv, "oliv", img, "olivier_2.jpg");
+//	initCharacterOrObject(beer, "beer", imgBeer, "binouze_2.jpg");
+	gameLoop();
+		
+</script>
+
+</body>
+</html>
